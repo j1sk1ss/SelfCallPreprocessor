@@ -20,6 +20,20 @@ def _get_name_from_cast(node) -> str | None:
     
     return None
 
+def _has_self_argument(name: str, args: list | None) -> bool:
+    if not args:
+        return False
+    
+    for arg in args:
+        if isinstance(arg, c_ast.ID):
+            if arg.name == name:
+                return True
+        elif isinstance(arg, c_ast.UnaryOp):
+            if arg.expr.name == name:
+                return True
+    
+    return False
+
 class SelfCallHiddenAdder(c_ast.NodeVisitor):
     """Main AST walker. The main task of this walker is:
         - Find a structure's function call
@@ -29,7 +43,8 @@ class SelfCallHiddenAdder(c_ast.NodeVisitor):
     Args:
         c_ast (_type_): Default constructor for an AST walker
     """
-    def __init__(self):
+    def __init__(self, symtab: dict):
+        self.symtab = symtab
         self.scopes = [{}]
         
     def push_scope(self) -> None:
@@ -80,6 +95,14 @@ class SelfCallHiddenAdder(c_ast.NodeVisitor):
                         if base_structure:
                             base_structure = _get_base_type_from_decl(base_structure)
                         
-                    print(f"[{base_structure}] {structure_name}.{struct_field}")
+                    if struct_field in self.symtab.get(base_structure, []) and not _has_self_argument(structure_name, args):
+                        selfcall = c_ast.ID(name=structure_name)
+                        if node.name.type == '.':
+                            selfcall = c_ast.UnaryOp(op='&', expr=selfcall)
+                        
+                        if args:
+                            node.args.exprs.insert(0, selfcall)
+                        else:
+                            node.args = c_ast.ParamList(params=[selfcall])
         except Exception as ex:
             print(ex)

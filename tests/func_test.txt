@@ -1,5 +1,5 @@
 typedef struct string {
-    int (*get_size)(struct string*);
+    int __attribute__((selfcall)) (*get_size)(struct string*);
 } string_t;
 
 int foo(string_t* a) {
