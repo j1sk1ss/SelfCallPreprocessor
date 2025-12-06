@@ -61,5 +61,32 @@ int main() {
 This tool allows us to ignore the first `self` parameter when we invoke function with the `selfcall` attribute from a structure. 
 
 # How it works?
+## Summary
+Let's consider the next code snippet:
+```c
+typedef struct {
+    int (*get_size)( /* processor::selfcall */ );
+    int (*set_size)( /* processor::selfcall */ int );
+} string_t;
 
+void foo(string_t* a) {
+    a->set_size(a->get_size());
+}
+```
 
+This is a very simple example of the `selfcall` annotation. With the `processor::selfcall` usage, an user can "reserve" the first argument for the `self` pointer. Aforementioned code snippet, after such a transformation becames a less-readeble, but at least, a correct version of C-code.
+```c
+typedef struct __anon_struct_string_t
+{
+  int (*get_size)(struct __anon_struct_string_t *);
+  int (*set_size)(struct __anon_struct_string_t *, int);
+} string_t;
+void foo(string_t *a)
+{
+  a->set_size(a, a->get_size(a));
+}
+```
+
+## C-preprocessor part
+## Layout part
+## AST part

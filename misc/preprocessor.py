@@ -1,31 +1,24 @@
 import re
 
 class SelfcallExtractor:
-    """
-    typedef struct NAME { ... } ALIAS;
-    {
-        "NAME"  -> [attribute functions]
-        "ALIAS" -> [attribute functions]
-    }
-    """
-
+    # typedef struct [tag]? { body } alias ;
     _typedef_re = re.compile(
         r"""
         typedef\s+struct
-            \s*(?P<tag>\w+)?
+            \s*(?P<tag>\w+)?      
             \s*\{(?P<body>.*?)\}\s*
             (?P<alias>\w+)\s*;
-        """,
-        re.DOTALL | re.VERBOSE
+        """, re.DOTALL | re.VERBOSE
     )
 
+    # struct name { body };
     _struct_re = re.compile(
         r"""
         struct\s+(?P<name>\w+)\s*\{(?P<body>.*?)\}\s*;
-        """,
-        re.DOTALL | re.VERBOSE
+        """, re.DOTALL | re.VERBOSE
     )
 
+    # named selfcall fields with attribute
     _fp_with_attr_re = re.compile(
         r"""
         (?P<rettype>[\w\s\*\(\)\[\]]+?)
@@ -34,49 +27,109 @@ class SelfcallExtractor:
         \s*\(\s*\*\s*(?P<fname>\w+)\s*\)
         \s*\(\s*(?P<args>[^;)]*?)\s*\)
         \s*;
-        """,
-        re.DOTALL | re.VERBOSE
+        """, re.DOTALL | re.VERBOSE
     )
-    
-    _attr_remove_re = re.compile(
-        r"__attribute__\s*\(\([^)]*\)\)",
-        re.DOTALL
+
+    # find processor::selfcall comment
+    _processor_selfcall_re = re.compile(
+        r"/\*\s*processor::selfcall\s*\*/"
     )
 
     def __init__(self, code: str):
-        self.code = code
+        self.original_code = code
 
     def _extract_methods(self, body: str) -> list[str]:
         methods = []
-        for m in self._fp_with_attr_re.finditer(body):
-            if "selfcall" in m.group("attrs"):
+        pattern = re.compile(
+            r"""
+            (?P<rettype>[\w\s\*\(\)]+?)
+            \(\s*\*\s*(?P<fname>\w+)\s*\)
+            \s*\(
+                (?P<args>[^)]*)
+            \)
+            \s*;
+            """, re.DOTALL | re.VERBOSE
+        )
+
+        for m in pattern.finditer(body):
+            args = m.group("args")
+            if "processor::selfcall" in args:
                 methods.append(m.group("fname"))
-        
-        out = []
+
+        uniq = []
         for f in methods:
-            if f not in out:
-                out.append(f)
-        
-        return out
+            if f not in uniq:
+                uniq.append(f)
 
-    def extract(self) -> tuple:
-        result = {}
+        return uniq
 
-        for m in self._typedef_re.finditer(self.code):
+    def _replace_processor_selfcall(self, code: str, struct_name: str) -> str:
+        pattern = self._processor_selfcall_re
+        repl = f"struct {struct_name}*"
+
+        def do_replace(match: re.Match):
+            start = match.start()
+            end   = match.end()
+
+            tail = code[end:]
+            limit = re.search(r'[);]', tail)
+            if limit:
+                tail = tail[:limit.start()]
+
+            stripped = tail.lstrip()
+            if not stripped:
+                return repl
+
+            return f"{repl}, "
+
+        return pattern.sub(do_replace, code)
+
+    def extract(self) -> tuple[dict[str, list[str]], str]:
+        result: dict[str, list[str]] = {}
+        code = self.original_code
+        typedef_matches = list(self._typedef_re.finditer(code))
+        for m in typedef_matches:
             tag = m.group("tag")
             alias = m.group("alias")
             body = m.group("body")
 
-            methods = self._extract_methods(body)
-            result[alias] = methods
-            struct_name = tag or alias
-            result[struct_name] = methods.copy()
+            struct_name = tag or f"__anon_struct_{alias}"
 
-        for m in self._struct_re.finditer(self.code):
+            if not tag:
+                old = m.group(0)
+                new = f"typedef struct {struct_name} {{{body}}} {alias};"
+                code = code.replace(old, new)
+
+            methods = []
+            methods.extend(self._extract_methods(body))
+            methods.extend(self._extract_methods(body))
+
+            uniq = []
+            for f in methods:
+                if f not in uniq:
+                    uniq.append(f)
+
+            result[alias] = uniq
+            result[struct_name] = uniq.copy()
+
+            code = self._replace_processor_selfcall(code, struct_name)
+
+        struct_matches = list(self._struct_re.finditer(code))
+        for m in struct_matches:
             name = m.group("name")
             body = m.group("body")
-            methods = self._extract_methods(body)
-            result[name] = methods
 
-        cleaned_code = self._attr_remove_re.sub("", self.code)
-        return result, cleaned_code
+            methods = []
+            methods.extend(self._extract_methods_attribute(body))
+            methods.extend(self._extract_methods_processor(body))
+
+            uniq = []
+            for f in methods:
+                if f not in uniq:
+                    uniq.append(f)
+
+            result[name] = uniq
+            code = self._replace_processor_selfcall(code, name)
+
+        return result, code
+

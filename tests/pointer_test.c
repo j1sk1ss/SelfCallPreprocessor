@@ -1,9 +1,4 @@
-typedef struct string {
-    int   __attribute__((selfcall)) (*get_size)(struct string*);
-    char* __attribute__((selfcall)) (*get_body)(struct string*);
-    int   __attribute__((selfcall)) (*set_body)(struct string*, char*);
-} string_t;
-
+#include "header.h"
 void foo() {
     string_t s;
     void* b = &s;
@@ -16,5 +11,4 @@ void foo() {
 
     ((string_t*)b)->set_body("Hello world!");
     s.set_body("Hello world!");
-    
 }

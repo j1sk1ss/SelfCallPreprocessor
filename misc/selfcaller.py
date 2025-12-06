@@ -1,6 +1,15 @@
 from pycparser import c_ast
 
 def _get_base_type_from_decl(node) -> str | None:
+    """AST help function.
+        Primarily works with declaration node.
+
+    Args:
+        node (c_ast.Decl): Declaration node
+
+    Returns:
+        str | None: The base type of the node
+    """
     if isinstance(node, c_ast.Decl):
         return _get_base_type_from_decl(node.type)
     elif isinstance(node, c_ast.PtrDecl):
@@ -12,7 +21,15 @@ def _get_base_type_from_decl(node) -> str | None:
     
     return None
     
-def _get_name_from_cast(node) -> str | None:
+def _get_name_from_cast(node: c_ast.Cast | c_ast.ID) -> str | None:
+    """Return name from the cast AST node.
+
+    Args:
+        node (c_ast.Cast | c_ast.ID): Cast node
+
+    Returns:
+        str | None: Variable's name that is casted
+    """
     if isinstance(node, c_ast.Cast):
         return _get_name_from_cast(node.expr)
     elif isinstance(node, c_ast.ID):
@@ -21,6 +38,15 @@ def _get_name_from_cast(node) -> str | None:
     return None
 
 def _has_self_argument(name: str, args: list | None) -> bool:
+    """Check if argument's list already contains the self name.
+
+    Args:
+        name (str): Self name
+        args (list | None): Argument's list
+
+    Returns:
+        bool: Self already in arguments?
+    """
     if not args:
         return False
     
@@ -106,3 +132,5 @@ class SelfCallHiddenAdder(c_ast.NodeVisitor):
                             node.args = c_ast.ParamList(params=[selfcall])
         except Exception as ex:
             print(ex)
+            
+        self.generic_visit(node)
