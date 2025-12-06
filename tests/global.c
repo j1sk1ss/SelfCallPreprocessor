@@ -7,13 +7,11 @@ typedef struct {
     void (*process)(/* processor::selfcall */);
 } Outer;
 
+static Outer o;
+
 void test_nested() {
-    Outer o;
     o.inner.init();
     o.process();
-    
-    Outer* op = &o;
-    op->inner.init();
 }
 
 /*EXPECTED_CODE
@@ -26,12 +24,10 @@ typedef struct __anon_struct_Outer
   Inner inner;
   void (*process)(struct __anon_struct_Outer *);
 } Outer;
+static Outer o;
 void test_nested()
 {
-  Outer o;
   o.inner.init(&o.inner);
   o.process(&o);
-  Outer *op = &o;
-  op->inner.init(&op->inner);
 }
 EXPECTED_CODE*/

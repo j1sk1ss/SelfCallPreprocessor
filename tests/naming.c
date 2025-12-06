@@ -17,7 +17,7 @@ typedef struct __anon_struct_allias1_t
 } allias1_t;
 typedef struct allias2
 {
-  int (*foo)(struct __anon_struct_allias2_t *);
+  int (*foo)(struct allias2 *);
 };
 typedef struct 
 {

@@ -88,7 +88,6 @@ class SelfcallExtractor:
         return out
 
     def _replace_processor_selfcall(self, code: str, struct_name: str) -> str:
-        pattern = self._processor_selfcall_re
         repl = f"struct {struct_name}*"
 
         def do_replace(match: re.Match):
@@ -106,7 +105,7 @@ class SelfcallExtractor:
 
             return f"{repl}, "
 
-        return pattern.sub(do_replace, code)
+        return self._processor_selfcall_re.sub(do_replace, code)
 
     def extract(self) -> tuple[dict[str, list[str]], dict[str, list[str]], str]:
         result: dict[str, list[str]] = {}
@@ -127,11 +126,20 @@ class SelfcallExtractor:
             methods.extend(self._extract_methods(body))
 
             field_types = self._extract_field_types(body)
-
+            new_body = self._replace_processor_selfcall(body, struct_name)
+            
             if not tag and len(methods) > 0:
                 old = m.group(0)
-                new = f"typedef struct {struct_name} {{{body}}} {alias};"
+                new = f"typedef struct {struct_name} {{{new_body}}} {alias};"
                 code = code.replace(old, new)
+            else:
+                old_body = m.group("body")
+                if old_body != new_body:
+                    old = m.group(0)
+                    start = old.find("{") + 1
+                    end = old.rfind("}")
+                    new_definition = old[:start] + new_body + old[end:]
+                    code = code.replace(old, new_definition)
 
             uniq_methods = []
             for f in methods:
@@ -147,8 +155,6 @@ class SelfcallExtractor:
 
             deps[alias] = field_types.copy()
             deps[struct_name] = field_types.copy()
-
-            code = self._replace_processor_selfcall(code, struct_name)
 
         struct_matches = list(self._struct_re.finditer(code))
         for m in struct_matches:

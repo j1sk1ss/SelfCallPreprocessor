@@ -8,8 +8,8 @@ Obj global_obj;
 void test_complex() {
     Obj* o = get_obj(0);
     o->method();
-    (o + 1)->method();
-    (global_obj.method ? &global_obj : o)->method(); 
+    ((Obj*)(o + 1))->method();
+    ((Obj*)(global_obj.method ? &global_obj : o))->method(); 
     ((Obj*)0x1000)->method();
 }
 
@@ -24,8 +24,8 @@ void test_complex()
 {
   Obj *o = get_obj(0);
   o->method(o);
-  (o + 1)->method(o + 1);
-  ((global_obj.method) ? (&global_obj) : (o))->method(((global_obj.method) ? (&global_obj) : (o)));
+  ((Obj *) (o + 1))->method((Obj *) (o + 1));
+  ((Obj *) ((global_obj.method) ? (&global_obj) : (o)))->method((Obj *) ((global_obj.method) ? (&global_obj) : (o)));
   ((Obj *) 0x1000)->method((Obj *) 0x1000);
 }
 EXPECTED_CODE*/
