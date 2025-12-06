@@ -9,30 +9,33 @@ This repository contains a preprocessor for C language. The main idea is the `se
 - `vscode` - Preprocessor's extention to supress warnings from a canonical C-extention.
 - `main.py` - Entry point.
 
+## Requier tools & Usage
+### Resuired tools
+### Usage
+
 ## SelfCall idea
-The idea is simple. I love C language, and I want to improve it with the next attribute:
-```c
-__attribute__((selfcall))
+The idea is simple. I love C language, and I want to improve it with the next annotation:
+```
+processor::selfcall
 ```
 
-This attribute allows us to build and use structures in a completly new way:
+This annotation allows us to build and use structures in a completly new way:
 ```c
 // foo.h
-#define str_self struct string*
 typedef struct string {
     int   size;
     char* body;
-    int   __attribute__((selfcall)) (*get_size)(str_self);
-    char* __attribute__((selfcall)) (*get_body)(str_self);
+    int   (*get_size)( /* processor::selfcall */ );
+    char* (*get_body)( /* processor::selfcall */ );
 } string_t;
 
 // foo.c
 #include "foo.h"
-static int string_get_size(str_self self) {
+static int string_get_size(struct string* self) {
     return self->size;
 }
 
-static int string_get_body(str_self self) {
+static int string_get_body(struct string* self) {
     return self->body;
 }
 
@@ -48,7 +51,7 @@ int main() {
 }
 ```
 
-As you mentioned above, the string structure has addtional attributes before an every function defenition. This attribute used for a self argument passing to function calls, that are called from structures. In nutshell, we can use an aforementioned structure in the next way:
+As you mentioned above, the string structure has addtional annotation in argument' list in every function defenition. This annotation is used for a self argument passing to function calls, that are called from structures. In nutshell, we can use an aforementioned structure in the next new way:
 ```c
 int main() {
     string_t s;
@@ -58,7 +61,7 @@ int main() {
 }
 ```
 
-This tool allows us to ignore the first `self` parameter when we invoke function with the `selfcall` attribute from a structure. 
+This tool allows us to ignore the first `self` parameter when we invoke a function with the `selfcall` attribute from a structure. 
 
 # How it works?
 ## Summary
