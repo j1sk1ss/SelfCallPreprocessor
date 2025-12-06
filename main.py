@@ -22,15 +22,16 @@ if __name__ == '__main__':
     
     with open(args.file) as f:
         processor: SelfcallExtractor = SelfcallExtractor(f.read())
-        symtab, code = processor.extract()
+        symtab, struct_graph, code = processor.extract()
         
-        logger.info(f"Attributed functions: {symtab}")
+        logger.info(f"Annotated functions: {symtab}")
+        logger.info(f"Structure' dependency graph: {struct_graph}")
         logger.info(f"Pre-processed code:\n```c\n{code}```")
         
         parser = c_parser.CParser()
         ast = parser.parse(code)
         
-        v: SelfCallHiddenAdder = SelfCallHiddenAdder(symtab=symtab)
+        v: SelfCallHiddenAdder = SelfCallHiddenAdder(symtab=symtab, struct_graph=struct_graph)
         v.visit(ast)
         
         generator = c_generator.CGenerator()

@@ -63,6 +63,14 @@ def _has_self_argument(name: str, args: list | None) -> bool:
     return False
 
 def _find_self_for_call(node) -> c_ast.UnaryOp | c_ast.StructRef | c_ast.ID:
+    """Find a root of function call
+
+    Args:
+        node (_type_): Function call node
+
+    Returns:
+        c_ast.UnaryOp | c_ast.StructRef | c_ast.ID: Root of the function call
+    """
     if not isinstance(node.name, c_ast.StructRef):
         return None
 
@@ -94,7 +102,8 @@ class SelfCallHiddenAdder(c_ast.NodeVisitor):
     Args:
         c_ast (_type_): Default constructor for an AST walker.
     """
-    def __init__(self, symtab: dict):
+    def __init__(self, symtab: dict, struct_graph: dict):
+        self.struct_graph = struct_graph
         self.symtab = symtab
         self.scopes = [{}]
         
@@ -129,11 +138,11 @@ class SelfCallHiddenAdder(c_ast.NodeVisitor):
                 struct_node, field_chain = self._resolve_structref(node.name)
                 base_struct_type: str | None = None
 
-                if isinstance(struct_node, c_ast.ID):
-                    base_struct_type = struct_node.name # Use a symtable to figure out a structure' type
-                elif isinstance(struct_node, c_ast.Cast):
+                if isinstance(struct_node, c_ast.ID): # Direct access to the struct' field 
+                    base_struct_type = self._resolve_base_struct_type(struct_node=struct_node, field_chain=field_chain)
+                elif isinstance(struct_node, c_ast.Cast): # Access via casting
                     base_struct_type = _get_base_type_from_cast(struct_node)
-
+                    
                 func_name = field_chain[-1]
                 args = node.args.exprs if node.args else []
                 if (
@@ -150,6 +159,26 @@ class SelfCallHiddenAdder(c_ast.NodeVisitor):
 
         elif isinstance(node, c_ast.StructRef):
             self._proceed_structcall(node.name)
+
+    def _resolve_base_struct_type(self, struct_node, field_chain: list[str]) -> str:
+        base_struct_type = self.lookup(struct_node.name)
+        while not isinstance(base_struct_type, c_ast.IdentifierType):
+            base_struct_type = base_struct_type.type
+            
+        base_struct_type = base_struct_type.names[0]
+        while True:
+            changed = False
+            for dep_type, dep_field in self.struct_graph.get(base_struct_type, []):
+                if field_chain and dep_field == field_chain[0]:
+                    base_struct_type = dep_type
+                    field_chain = field_chain[1:]
+                    changed = True
+                    break
+                
+            if not changed or not field_chain:
+                break
+
+        return base_struct_type
 
     def _resolve_structref(self, structref):
         fields = []

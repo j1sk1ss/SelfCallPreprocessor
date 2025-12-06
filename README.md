@@ -5,7 +5,7 @@ This repository contains a preprocessor for C language. The main idea is the `se
 - `misc`:
     - `preprocessor.py` - Python attribute preprocessor. See `misc/README.md` for details.
     - `selfcaller.py` - Python the `C language AST-walker `. See `misc/README.md` for details.
-- `tests` - C source files for a test purpose.
+- `tests` - C source files for test purposes.
 - `vscode` - Preprocessor's extention to supress warnings from a canonical C-extention.
 - `main.py` - Entry point.
 
@@ -17,11 +17,24 @@ There is a few things that are needed before we can proceed any further:
 - [loguru](https://github.com/Delgan/loguru) - Fancy-looking logg messages. 
 
 ### Usage
+For a sundbox usage, simply use the one of next commands:
+```bash
+python3 main.py --file tests/func_test.c
+python3 main.py --file tests/cast_structs.c
+python3 main.py --file tests/complex_structs.c
+python3 main.py --file tests/nested_structs.c
+```
+
+### Testing
+For testing use the next command:
+```bash
+python3 test.py
+```
 
 ## SelfCall idea
 The idea is simple. I love C language, and I want to improve it with the next annotation:
-```
-processor::selfcall
+```c
+/* processor::selfcall */
 ```
 
 This annotation allows us to build and use structures in a completly new way:
@@ -96,5 +109,53 @@ void foo(string_t *a)
 ```
 
 ## C-preprocessor part
+Before any work can be performed, we should get rid from a high-level pre-processor instructions such as `define`, `ifdef`, `undef`, `include`, `__attribute__`, etc. This work can be performed without any problems with use of the inbuilt gcc' pre-processor.
+
 ## Layout part
+After C-pre-processor part we receive a raw form of a code. For instance I implie the next code as a raw code:
+```c
+typedef struct {
+    int (*foo)( /* processor::selfcall */ );
+} a_t;
+
+typedef struct {
+    void* b;
+} b_t;
+
+typedef struct {
+    void* c;
+} c_t;
+
+int bar() {
+    c_t c2; (
+        (a_t*)(
+            (b_t*)c2.c
+        )->b
+    )->foo();
+}
+```
+
+With the `misc/preprocessor.py` tool we mark all structures, their depends, and `selfcall` functions. First things first we generate names for structs without name and with an annotated by `selfcall` function:
+```c
+typedef struct __anon_struct_a_t {
+    int (*foo)( /* processor::selfcall */ );
+} a_t;
+```
+
+Secondly, we replace the annotation `/* processor::selfcall */` with a structure signature:
+```c
+typedef struct __anon_struct_a_t {
+    int (*foo)( struct __anon_struct_a_t* );
+} a_t;
+```
+
+That' all what we do at this level. Now we can proceed further.
+
 ## AST part
+With a prepared source code, we can safely invoke the `pycparser` library as a main parser in this project. The main idea of this part is simple:
+- Find a function call node.
+- Check if this function call invoked from a structure.
+- Determine which structure is used.
+- Determine is the invoked function annotated as a `selfcall` function. 
+- If it is, pass the structure itselves to the function' arguments list.
+- Restore the source code from an AST and pass it further.
