@@ -15,6 +15,14 @@ class SelfcallExtractor:
         struct\s+(?P<name>\w+)\s*\{(?P<body>.*?)\}\s*;
         """, re.DOTALL | re.VERBOSE
     )
+    
+    _comments = re.compile(
+        r"""
+        //.*?$            |
+        /\*.*?\*/
+        """,
+        re.DOTALL | re.MULTILINE | re.VERBOSE
+    )
 
     _processor_selfcall_re = re.compile(
         r"/\*\s*processor::selfcall\s*\*/"
@@ -165,6 +173,7 @@ class SelfcallExtractor:
 
             code = self._replace_processor_selfcall(code, name)
 
+        code = re.sub(self._comments, "", code)
         return result, deps, code
 
 if __name__ == '__main__':
@@ -181,6 +190,9 @@ typedef struct {
 typedef struct {
     b_t b;
 } c_t;
+
+/*EXPECTED_CODE
+EXPECTED_CODE*/
         """
     )
     
@@ -189,7 +201,7 @@ typedef struct {
         "a_t": ["foo"],
         "__anon_struct_a_t": ["foo"],
     }
-
+    
     expected_deps = {
         "a_t": [],
         "__anon_struct_a_t": [],
