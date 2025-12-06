@@ -18,19 +18,7 @@ class SelfcallExtractor:
         """, re.DOTALL | re.VERBOSE
     )
 
-    # named selfcall fields with attribute
-    _fp_with_attr_re = re.compile(
-        r"""
-        (?P<rettype>[\w\s\*\(\)\[\]]+?)
-        \s*
-        __attribute__\s*\(\(\s*(?P<attrs>[^)]+?)\)\)
-        \s*\(\s*\*\s*(?P<fname>\w+)\s*\)
-        \s*\(\s*(?P<args>[^;)]*?)\s*\)
-        \s*;
-        """, re.DOTALL | re.VERBOSE
-    )
-
-    # find processor::selfcall comment
+    # processor::selfcall
     _processor_selfcall_re = re.compile(
         r"/\*\s*processor::selfcall\s*\*/"
     )
@@ -95,14 +83,16 @@ class SelfcallExtractor:
 
             struct_name = tag or f"__anon_struct_{alias}"
 
+            methods = []
+            methods.extend(self._extract_methods(body))
+            methods.extend(self._extract_methods(body))
+            if len(methods) <= 0:
+                continue
+
             if not tag:
                 old = m.group(0)
                 new = f"typedef struct {struct_name} {{{body}}} {alias};"
                 code = code.replace(old, new)
-
-            methods = []
-            methods.extend(self._extract_methods(body))
-            methods.extend(self._extract_methods(body))
 
             uniq = []
             for f in methods:
@@ -120,8 +110,10 @@ class SelfcallExtractor:
             body = m.group("body")
 
             methods = []
-            methods.extend(self._extract_methods_attribute(body))
-            methods.extend(self._extract_methods_processor(body))
+            methods.extend(self._extract_methods(body))
+            methods.extend(self._extract_methods(body))
+            if len(methods) <= 0:
+                continue
 
             uniq = []
             for f in methods:

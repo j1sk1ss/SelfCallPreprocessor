@@ -11,6 +11,11 @@ This repository contains a preprocessor for C language. The main idea is the `se
 
 ## Requier tools & Usage
 ### Resuired tools
+There is a few things that are needed before we can proceed any further:
+- [gcc](https://gcc.gnu.org/) - GCC or Clang compilers are essential for a basic C-preprocessing.
+- [pycparcer](https://github.com/eliben/pycparser) - Basic library for AST operations.
+- [loguru](https://github.com/Delgan/loguru) - Fancy-looking logg messages. 
+
 ### Usage
 
 ## SelfCall idea

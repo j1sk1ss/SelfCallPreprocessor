@@ -5,10 +5,10 @@ def _get_base_type_from_decl(node) -> str | None:
         Primarily works with declaration node.
 
     Args:
-        node (c_ast.Decl): Declaration node
+        node (c_ast.Decl): Declaration node.
 
     Returns:
-        str | None: The base type of the node
+        str | None: The base type of the node.
     """
     if isinstance(node, c_ast.Decl):
         return _get_base_type_from_decl(node.type)
@@ -21,17 +21,19 @@ def _get_base_type_from_decl(node) -> str | None:
     
     return None
     
-def _get_name_from_cast(node: c_ast.Cast | c_ast.ID) -> str | None:
-    """Return name from the cast AST node.
+def _get_base_type_from_cast(node: c_ast.Cast | c_ast.ID) -> str | None:
+    """Return type from the cast AST node.
 
     Args:
-        node (c_ast.Cast | c_ast.ID): Cast node
+        node (c_ast.Cast | c_ast.ID): Cast node.
 
     Returns:
-        str | None: Variable's name that is casted
+        str | None: Variable's name that is casted.
     """
     if isinstance(node, c_ast.Cast):
-        return _get_name_from_cast(node.expr)
+        return node.to_type.type.type.type.names[0]
+    elif isinstance(node, c_ast.StructRef):
+        return _get_base_type_from_cast(node.name)
     elif isinstance(node, c_ast.ID):
         return node.name
     
@@ -41,8 +43,8 @@ def _has_self_argument(name: str, args: list | None) -> bool:
     """Check if argument's list already contains the self name.
 
     Args:
-        name (str): Self name
-        args (list | None): Argument's list
+        name (str): Self name.
+        args (list | None): Argument' list.
 
     Returns:
         bool: Self already in arguments?
@@ -60,14 +62,37 @@ def _has_self_argument(name: str, args: list | None) -> bool:
     
     return False
 
+def _find_self_for_call(node) -> c_ast.UnaryOp | c_ast.StructRef | c_ast.ID:
+    if not isinstance(node.name, c_ast.StructRef):
+        return None
+
+    chain = []
+    ref = node.name
+    while isinstance(ref, c_ast.StructRef):
+        chain.append(ref)
+        ref = ref.name
+
+    if isinstance(ref, (c_ast.ID, c_ast.Cast)):
+        base = ref
+    else:
+        return None
+
+    for struct_ref in reversed(chain[1:]):
+        base = c_ast.StructRef(name=base, type=struct_ref.type, field=struct_ref.field)
+
+    last_op = chain[0].type if chain else '.'
+    if last_op == '.':
+        base = c_ast.UnaryOp(op='&', expr=base)
+
+    return base
+
 class SelfCallHiddenAdder(c_ast.NodeVisitor):
     """Main AST walker. The main task of this walker is:
-        - Find a structure's function call
-        - Determine a type of this structure
-        - Check a symtable for a __attribute__((selfcall)) attribute
+        - Find a structure' function call.
+        - Determine a type of this structure.
 
     Args:
-        c_ast (_type_): Default constructor for an AST walker
+        c_ast (_type_): Default constructor for an AST walker.
     """
     def __init__(self, symtab: dict):
         self.symtab = symtab
@@ -98,39 +123,47 @@ class SelfCallHiddenAdder(c_ast.NodeVisitor):
         self.generic_visit(node)
         self.pop_scope()
         
+    def _proceed_structcall(self, node) -> None:
+        if isinstance(node, c_ast.FuncCall):
+            if isinstance(node.name, c_ast.StructRef):
+                struct_node, field_chain = self._resolve_structref(node.name)
+                base_struct_type: str | None = None
+
+                if isinstance(struct_node, c_ast.ID):
+                    base_struct_type = struct_node.name # Use a symtable to figure out a structure' type
+                elif isinstance(struct_node, c_ast.Cast):
+                    base_struct_type = _get_base_type_from_cast(struct_node)
+
+                func_name = field_chain[-1]
+                args = node.args.exprs if node.args else []
+                if (
+                    base_struct_type and
+                    func_name in self.symtab.get(base_struct_type, []) and
+                    not _has_self_argument(base_struct_type, args)
+                ):
+                    self_node = _find_self_for_call(node)
+                    if self_node:
+                        if node.args:
+                            node.args.exprs.insert(0, self_node)
+                        else:
+                            node.args = c_ast.ParamList(params=[self_node])
+
+        elif isinstance(node, c_ast.StructRef):
+            self._proceed_structcall(node.name)
+
+    def _resolve_structref(self, structref):
+        fields = []
+        node = structref
+        while isinstance(node, c_ast.StructRef):
+            fields.insert(0, node.field.name)
+            node = node.name
+            
+        return node, fields
+        
     def visit_FuncCall(self, node):
         try:
-            if isinstance(node.name, c_ast.StructRef):
-                if node.name.type in ['->', '.']:
-                    structure_name: str | None = None
-                    struct_field: str = node.name.field.name
-                    base_structure: str | None = None
-                    
-                    args: list | None = None
-                    if node.args:
-                        args = []
-                        for i in node.args.exprs:
-                            args.append(i)
-                    
-                    if isinstance(node.name.name, c_ast.Cast):
-                        structure_name = _get_name_from_cast(node.name.name)
-                        base_structure = node.name.name.to_type.type.type.type.names[0]
-                    elif isinstance(node.name.name, c_ast.ID):
-                        structure_name = node.name.name.name
-                        base_structure = self.lookup(structure_name)
-                        if base_structure:
-                            base_structure = _get_base_type_from_decl(base_structure)
-                        
-                    if struct_field in self.symtab.get(base_structure, []) and not _has_self_argument(structure_name, args):
-                        selfcall = c_ast.ID(name=structure_name)
-                        if node.name.type == '.':
-                            selfcall = c_ast.UnaryOp(op='&', expr=selfcall)
-                        
-                        if args:
-                            node.args.exprs.insert(0, selfcall)
-                        else:
-                            node.args = c_ast.ParamList(params=[selfcall])
+            self._proceed_structcall(node)
         except Exception as ex:
-            print(ex)
-            
+            print("Error processing FuncCall:", ex)
+
         self.generic_visit(node)
