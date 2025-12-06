@@ -162,8 +162,8 @@ With a prepared source code, we can safely invoke the `pycparser` library as a m
 
 The final result of aforementioned operations is a code, where all function calls, that are marked as `selfcall`s, fulfiled with the structure' pointer:
 ```c
-typedef struct {
-    int (*foo)( /* processor::selfcall */ );
+typedef struct __anon_struct_a_t {
+    int (*foo)( struct __anon_struct_a_t* );
 } a_t;
 
 typedef struct {
