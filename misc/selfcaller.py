@@ -137,7 +137,7 @@ class SelfCallHiddenAdder(c_ast.NodeVisitor):
             if isinstance(node.name, c_ast.StructRef):
                 struct_node, field_chain = self._resolve_structref(node.name)
                 base_struct_type: str | None = None
-
+                
                 if isinstance(struct_node, c_ast.ID): # Direct access to the struct' field 
                     base_struct_type = self._resolve_base_struct_type(struct_node=struct_node, field_chain=field_chain)
                 elif isinstance(struct_node, c_ast.Cast): # Access via casting

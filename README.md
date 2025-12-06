@@ -9,8 +9,8 @@ This repository contains a preprocessor for C language. The main idea is the `se
 - `vscode` - Preprocessor's extention to supress warnings from a canonical C-extention.
 - `main.py` - Entry point.
 
-## Requier tools & Usage
-### Resuired tools
+## Requiered tools & Usage
+### Required tools
 There is a few things that are needed before we can proceed any further:
 - [gcc](https://gcc.gnu.org/) - GCC or Clang compilers are essential for a basic C-preprocessing.
 - [pycparcer](https://github.com/eliben/pycparser) - Basic library for AST operations.
@@ -69,7 +69,7 @@ int main() {
 }
 ```
 
-As you mentioned above, the string structure has addtional annotation in argument' list in every function defenition. This annotation is used for a self argument passing to function calls, that are called from structures. In nutshell, we can use an aforementioned structure in the next new way:
+As you've notice above, the string structure has addtional annotation in argument' list in every function defenition. This annotation is used for a self argument passing to function calls, that are called from structures. In nutshell, we can use an aforementioned structure in the next new way:
 ```c
 int main() {
     string_t s;
@@ -159,3 +159,23 @@ With a prepared source code, we can safely invoke the `pycparser` library as a m
 - Determine is the invoked function annotated as a `selfcall` function. 
 - If it is, pass the structure itselves to the function' arguments list.
 - Restore the source code from an AST and pass it further.
+
+The final result of aforementioned operations is a code, where all function calls, that are marked as `selfcall`s, fulfiled with the structure' pointer:
+```c
+typedef struct {
+    int (*foo)( /* processor::selfcall */ );
+} a_t;
+
+typedef struct {
+    void* b;
+} b_t;
+
+typedef struct {
+    void* c;
+} c_t;
+
+int bar() {
+    c_t c2; 
+    ((a_t*)((b_t*)c2.c)->b)->foo((a_t*)((b_t*)c2.c)->b);
+}
+```
