@@ -9,7 +9,8 @@ void test_array() {
     
     Item* ptr = items;
     ((Item*)&ptr[5])->reset();
-    
+    ptr->reset();
+
     for(int i = 0; i < 10; i++) {
         items[i].reset();
     }

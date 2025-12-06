@@ -76,17 +76,20 @@ def _find_self_for_call(node) -> c_ast.UnaryOp | c_ast.StructRef | c_ast.ID:
 
     chain = []
     ref = node.name
-    while isinstance(ref, c_ast.StructRef):
+    while isinstance(ref, c_ast.StructRef) or isinstance(ref, c_ast.ArrayRef):
         chain.append(ref)
         ref = ref.name
-
+    
     if isinstance(ref, (c_ast.ID, c_ast.Cast)):
         base = ref
     else:
         return None
 
     for struct_ref in reversed(chain[1:]):
-        base = c_ast.StructRef(name=base, type=struct_ref.type, field=struct_ref.field)
+        if isinstance(struct_ref, c_ast.StructRef):
+            base = c_ast.StructRef(name=base, type=struct_ref.type, field=struct_ref.field)
+        elif isinstance(struct_ref, c_ast.ArrayRef):
+            base = c_ast.ArrayRef(name=base, subscript=struct_ref.subscript)
 
     last_op = chain[0].type if chain else '.'
     if last_op == '.':
@@ -140,9 +143,11 @@ class SelfCallHiddenAdder(c_ast.NodeVisitor):
                 
                 if isinstance(struct_node, c_ast.ID): # Direct access to the struct' field 
                     base_struct_type = self._resolve_base_struct_type(struct_node=struct_node, field_chain=field_chain)
+                elif isinstance(struct_node, c_ast.ArrayRef): # Struct' array usage
+                    base_struct_type = self._resolve_base_struct_type(struct_node=struct_node, field_chain=field_chain)
                 elif isinstance(struct_node, c_ast.Cast): # Access via casting
                     base_struct_type = _get_base_type_from_cast(struct_node)
-                    
+                
                 func_name = field_chain[-1]
                 args = node.args.exprs if node.args else []
                 if (
@@ -161,7 +166,13 @@ class SelfCallHiddenAdder(c_ast.NodeVisitor):
             self._proceed_structcall(node.name)
 
     def _resolve_base_struct_type(self, struct_node, field_chain: list[str]) -> str:
-        base_struct_type = self.lookup(struct_node.name)
+        def _get_name(node) -> str:
+            while not isinstance(node, str):
+                node = node.name
+        
+            return node
+        
+        base_struct_type = self.lookup(_get_name(struct_node))
         while not isinstance(base_struct_type, c_ast.IdentifierType):
             base_struct_type = base_struct_type.type
             
