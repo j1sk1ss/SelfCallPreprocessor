@@ -1,0 +1,7 @@
+typedef struct string {
+    int (*get_size)(struct string*);
+} string_t;
+
+int foo(string_t* a) {
+    return a->get_size(); 
+}
