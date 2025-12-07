@@ -3,6 +3,7 @@ import argparse
 sys.path.extend(['.', '..'])
 
 import pyfiglet
+from pathlib import Path
 from pycparser import c_parser, c_generator
 from loguru import logger
 
@@ -26,7 +27,49 @@ if __name__ == '__main__':
         exit(0)
     
     if args.directory:
-        pass
+        def _collect_global_symbols(directory: Path) -> tuple:
+            global_symtab: dict[str, list[str]] = {}
+            global_graph: dict[str, list[str]] = {}
+
+            for path in directory.rglob("*"):
+                if path.suffix.lower() in (".c", ".h"):
+                    with path.open() as f:
+                        processor = SelfcallExtractor(f.read())
+                        symtab, struct_graph = processor.build_symtable()
+                        global_symtab.update(symtab)                    
+                        for k, v in struct_graph.items():
+                            if k not in global_graph:
+                                global_graph[k] = []
+                                
+                            global_graph[k].extend(v)
+
+            return global_symtab, global_graph
+
+        def _process_all_files(directory: Path, symtab: dict, struct_graph: dict) -> None:
+            for path in directory.rglob("*"):
+                if path.suffix.lower() in (".c", ".h"):
+                    with path.open() as f:
+                        processor = SelfcallExtractor(f.read())
+
+                        processed_code = processor.process_code()
+                        logger.info(f"Pre-processed code in {path}:\n```c\n{processed_code}```")
+
+                        parser = c_parser.CParser()
+                        ast = parser.parse(processed_code)
+
+                        v = SelfCallHiddenAdder(symtab=symtab, struct_graph=struct_graph)
+                        v.visit(ast)
+
+                        generator = c_generator.CGenerator()
+                        result = generator.visit(ast)
+
+                        logger.info(f"Processed code in {path}:\n```c\n{result}```")
+
+        directory = Path(args.directory)
+        symtab, struct_graph = _collect_global_symbols(directory)
+        logger.info(f"Global symbol table: {symtab}")
+        logger.info(f"Global struct dependency graph: {struct_graph}")
+        _process_all_files(directory, symtab, struct_graph)
     elif args.file:
         with open(args.file) as f:
             processor: SelfcallExtractor = SelfcallExtractor(f.read())
