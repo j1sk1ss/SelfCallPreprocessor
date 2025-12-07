@@ -107,27 +107,72 @@ class SelfcallExtractor:
 
         return self._processor_selfcall_re.sub(do_replace, code)
 
-    def extract(self) -> tuple[dict[str, list[str]], dict[str, list[str]], str]:
-        result: dict[str, list[str]] = {}
-        deps: dict[str, list[str]] = {}
-
-        code = self.original_code
-
-        typedef_matches = list(self._typedef_re.finditer(code))
-        for m in typedef_matches:
+    def build_symtable(self) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+        symtable: dict[str, list[str]] = {}
+        dep_graph: dict[str, list[str]] = {}
+        
+        for m in self._typedef_re.finditer(self.original_code):
             tag   = m.group("tag")
             alias = m.group("alias")
             body  = m.group("body")
-
-            struct_name = tag or f"__anon_struct_{alias}"
 
             methods = []
             methods.extend(self._extract_methods(body))
             methods.extend(self._extract_methods(body))
 
             field_types = self._extract_field_types(body)
+            uniq_methods = []
+            for f in methods:
+                if f not in uniq_methods:
+                    uniq_methods.append(f)
+
+            if len(methods) == 0:
+                struct_name = alias
+            else:
+                struct_name = tag or f"__anon_struct_{alias}"
+                
+            if uniq_methods:
+                symtable[alias] = uniq_methods
+                symtable[struct_name] = uniq_methods.copy()
+
+            dep_graph[alias] = field_types.copy()
+            dep_graph[struct_name] = field_types.copy()
+
+        for m in self._struct_re.finditer(self.original_code):
+            name = m.group("name")
+            body = m.group("body")
+
+            methods = []
+            methods.extend(self._extract_methods(body))
+            methods.extend(self._extract_methods(body))
+
+            field_types = self._extract_field_types(body)
+
+            uniq = []
+            for f in methods:
+                if f not in uniq:
+                    uniq.append(f)
+
+            if uniq:
+                symtable[name] = uniq
+
+            dep_graph[name] = field_types.copy()
+
+        return symtable, dep_graph
+
+    def process_code(self) -> str:
+        code = self.original_code
+        for m in self._typedef_re.finditer(code):
+            tag   = m.group("tag")
+            alias = m.group("alias")
+            body  = m.group("body")
+
+            methods = []
+            methods.extend(self._extract_methods(body))
+            methods.extend(self._extract_methods(body))
+
+            struct_name = tag or f"__anon_struct_{alias}"
             new_body = self._replace_processor_selfcall(body, struct_name)
-            
             if not tag and len(methods) > 0:
                 old = m.group(0)
                 new = f"typedef struct {struct_name} {{{new_body}}} {alias};"
@@ -149,38 +194,12 @@ class SelfcallExtractor:
             if len(methods) == 0:
                 struct_name = alias
 
-            if uniq_methods:
-                result[alias] = uniq_methods
-                result[struct_name] = uniq_methods.copy()
-
-            deps[alias] = field_types.copy()
-            deps[struct_name] = field_types.copy()
-
-        struct_matches = list(self._struct_re.finditer(code))
-        for m in struct_matches:
+        for m in self._struct_re.finditer(code):
             name = m.group("name")
-            body = m.group("body")
-
-            methods = []
-            methods.extend(self._extract_methods(body))
-            methods.extend(self._extract_methods(body))
-
-            field_types = self._extract_field_types(body)
-
-            uniq = []
-            for f in methods:
-                if f not in uniq:
-                    uniq.append(f)
-
-            if uniq:
-                result[name] = uniq
-
-            deps[name] = field_types.copy()
-
             code = self._replace_processor_selfcall(code, name)
 
         code = re.sub(self._comments, "", code)
-        return result, deps, code
+        return code
 
 if __name__ == '__main__':
     worker: SelfcallExtractor = SelfcallExtractor(
@@ -202,7 +221,7 @@ EXPECTED_CODE*/
         """
     )
     
-    result, deps, code = worker.extract()
+    result, deps = worker.build_symtable()
     expected_result = {
         "a_t": ["foo"],
         "__anon_struct_a_t": ["foo"],
@@ -218,4 +237,19 @@ EXPECTED_CODE*/
     assert result == expected_result, f"result mismatch:\n{result}\n!=\n{expected_result}"
     assert deps == expected_deps, f"deps mismatch:\n{deps}\n!=\n{expected_deps}"
 
+    expected: str = """
+typedef struct __anon_struct_a_t {
+    int (*foo)( struct __anon_struct_a_t* );
+} a_t;
+
+typedef struct {
+    a_t a;
+} b_t;
+
+typedef struct {
+    b_t b;
+} c_t;
+    """
+
+    assert worker.process_code().strip() == expected.strip(), "Resuled code mismatch!"
     print("Ok")
