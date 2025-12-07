@@ -42,7 +42,6 @@ class SelfcallExtractor:
         re.VERBOSE
     )
 
-
     def __init__(self, code: str):
         self.original_code = code
 
@@ -95,7 +94,6 @@ class SelfcallExtractor:
 
     def _replace_processor_selfcall(self, code: str, struct_name: str) -> str:
         repl = f"struct {struct_name}*"
-
         def do_replace(match: re.Match):
             start = match.start()
             end   = match.end()
@@ -143,7 +141,7 @@ class SelfcallExtractor:
 
             dep_graph[alias] = field_types.copy()
             dep_graph[struct_name] = field_types.copy()
-
+            
         for m in self._struct_re.finditer(self.original_code):
             name = m.group("name")
             body = m.group("body")

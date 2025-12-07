@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct string {
+typedef struct {
     unsigned int size;
     const char*  body;
     unsigned int (*length)( /* processor::selfcall */ );

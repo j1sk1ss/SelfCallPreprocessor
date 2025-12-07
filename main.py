@@ -1,5 +1,7 @@
+import subprocess
 import sys
 import argparse
+import tempfile
 sys.path.extend(['.', '..'])
 
 import pyfiglet
@@ -9,6 +11,20 @@ from loguru import logger
 
 from misc.selfcaller import SelfCallHiddenAdder
 from misc.preprocessor import SelfcallExtractor
+
+def _gcc_preprocess_code(include: str, code: str) -> str:
+    with tempfile.NamedTemporaryFile(suffix=".i", delete=True) as tmp:
+        cmd = [
+            "gcc",
+            "-E",
+            "-nostdinc",
+            f"-I{include}",
+            "-Imisc/pycparser_fake_libs"
+        ]
+
+        cmd += [ "-", "-o", tmp.name ]
+        subprocess.run(cmd, input=code.encode(), check=True)
+        return Path(tmp.name).read_text()
 
 if __name__ == '__main__':
     ascii_banner = pyfiglet.figlet_format("SelfCall preprocessor!")
@@ -46,30 +62,30 @@ if __name__ == '__main__':
             return global_symtab, global_graph
 
         def _process_all_files(directory: Path, symtab: dict, struct_graph: dict) -> None:
-            for path in directory.rglob("*"):
+            all_sources = ""
+            for path in sorted(directory.rglob("*")):
                 if path.suffix.lower() in (".c", ".h"):
                     with path.open() as f:
                         processor = SelfcallExtractor(f.read())
+                        modified_code = processor.process_code()
+                        all_sources += f"\n/* --- {path.relative_to(directory)} --- */\n"
+                        all_sources += modified_code
 
-                        processed_code = processor.process_code()
-                        logger.info(f"Pre-processed code in {path}:\n```c\n{processed_code}```")
+            preprocessed = _gcc_preprocess_code(args.include, all_sources)
+            parser = c_parser.CParser()
+            ast = parser.parse(preprocessed)
 
-                        parser = c_parser.CParser()
-                        ast = parser.parse(processed_code)
+            v = SelfCallHiddenAdder(symtab=symtab, struct_graph=struct_graph)
+            v.visit(ast)
 
-                        v = SelfCallHiddenAdder(symtab=symtab, struct_graph=struct_graph)
-                        v.visit(ast)
-
-                        generator = c_generator.CGenerator()
-                        result = generator.visit(ast)
-
-                        logger.info(f"Processed code in {path}:\n```c\n{result}```")
+            generator = c_generator.CGenerator()
+            return generator.visit(ast)
 
         directory = Path(args.directory)
         symtab, struct_graph = _collect_global_symbols(directory)
         logger.info(f"Global symbol table: {symtab}")
         logger.info(f"Global struct dependency graph: {struct_graph}")
-        _process_all_files(directory, symtab, struct_graph)
+        logger.info(f"Final code: \n```c\n{_process_all_files(directory, symtab, struct_graph)}\n```")
     elif args.file:
         with open(args.file) as f:
             processor: SelfcallExtractor = SelfcallExtractor(f.read())
