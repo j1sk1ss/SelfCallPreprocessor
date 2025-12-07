@@ -142,7 +142,10 @@ typedef struct __anon_struct_a_t {
 } a_t;
 ```
 
-Secondly, we replace the annotation `/* processor::selfcall */` with a structure signature:
+Then we create a symtable and dependency graph for a provided code / project. This structures will be very helpful at the AST-part. In few words, the `symtable` memorize all functions and structures with the `processor::selfcall` annotation. This helps us to determine, is the selected function reqire a hidden `self` parameter. The `dependency graph` is a simple `DAG`. It links nested structures with each other. To demonstrate such structures, I'll illustatrare them below:
+![symtab](media/first_phase.png)
+
+After aforementioned preparations, we replace the annotation `/* processor::selfcall */` with a structure signature:
 ```c
 typedef struct __anon_struct_a_t {
     int (*foo)( struct __anon_struct_a_t* );
@@ -179,3 +182,5 @@ int bar() {
     ((a_t*)((b_t*)c2.c)->b)->foo((a_t*)((b_t*)c2.c)->b);
 }
 ```
+
+# Benefits
