@@ -184,3 +184,66 @@ int bar() {
 ```
 
 # Benefits
+## Rust-style structures
+Now C-programmer is able to use C-structures in a more convenient way. Instead of always passing structure itself as `self`-parameter:
+```c
+typedef struct a {
+    int (*foo)(struct a*);
+} a_t;
+
+void bar(a_t* a) {
+    a->foo(a);
+}
+```
+
+he can simply annotate a function with `processor::selfcall` and use a Rust-like syntax:
+```c
+typedef struct {
+    int (*foo)( /* processor::selfcall */ );
+} a_t;
+
+void bar(a_t* a) {
+    a->foo();
+}
+```
+
+## Clean code
+Imagine a situation, where we're working with complex nested structures, that additionally are stored in variables with really long names:
+```c
+typedef struct a {
+    int (*foo)(struct a*);
+} a_t;
+
+typedef struct {
+    void* fang_is_always_singing_her_songs;
+} b_t;
+
+typedef struct {
+    void* b_pointer_im_not_kidding;
+} c_t;
+
+void bar(c_t* really_long_name_for_c) {
+    ((a_t*)((b_t*)really_long_name_for_c->b_pointer_im_not_kidding)->fang_is_always_singing_her_songs)->foo(((a_t*)((b_t*)really_long_name_for_c->b_pointer_im_not_kidding)->fang_is_always_singing_her_songs));
+}
+```
+
+This code looks really bad, isn't it? To improve the overall appearance, we can ignore essential `self`-argument in the `foo` function:
+```c
+typedef struct {
+    int (*foo)( /* processor::selfcall */ );
+} a_t;
+
+typedef struct {
+    void* fang_is_always_singing_her_songs;
+} b_t;
+
+typedef struct {
+    void* b_pointer_im_not_kidding;
+} c_t;
+
+void bar(c_t* really_long_name_for_c) {
+    ((a_t*)((b_t*)really_long_name_for_c->b_pointer_im_not_kidding)->fang_is_always_singing_her_songs)->foo();
+}
+```
+
+Now it looks a way better.
