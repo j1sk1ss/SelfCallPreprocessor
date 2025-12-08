@@ -254,5 +254,166 @@ void bar(c_t* really_long_name_for_c) {
 
 Now it looks a way better.
 
+## Namespaces
+We all know that C-language doesn't has any namespaces, that's why we usually encounter with a function naming problem. Actually we're able to solve such a problem with the `static` keyword and `headers`. This will "hide" a function' name from a compiler during a pre-processing phase. But what if we still need to use these functions? If we consider the code below:
+```c
+// a.h
+#ifndef A_H_
+#define A_H_
+void foo();
+void bar();
+void baz();
+#endif
+
+// b.h
+#ifndef B_H_
+#define B_H_
+void foo();
+void bar();
+void baz();
+#endif
+
+// main.c
+#include <a.h>
+#include <b.h>
+int main() {
+    foo();
+    bar();
+    baz();
+    return 0;
+}
+```
+
+the problem can be seen. Compiler will simply return the next error:
+```bash
+duplicate symbol '_baz' in:
+    /var/folders/74/d7gcqwxd1x9__83fh6m_lb6c0000gn/T/a-3b8c3b.o
+    /var/folders/74/d7gcqwxd1x9__83fh6m_lb6c0000gn/T/b-44b8f1.o
+duplicate symbol '_bar' in:
+    /var/folders/74/d7gcqwxd1x9__83fh6m_lb6c0000gn/T/a-3b8c3b.o
+    /var/folders/74/d7gcqwxd1x9__83fh6m_lb6c0000gn/T/b-44b8f1.o
+duplicate symbol '_foo' in:
+    /var/folders/74/d7gcqwxd1x9__83fh6m_lb6c0000gn/T/a-3b8c3b.o
+    /var/folders/74/d7gcqwxd1x9__83fh6m_lb6c0000gn/T/b-44b8f1.o
+ld: 3 duplicate symbols for architecture x86_64
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+```
+
+To solve it, we can easily use structures:
+```c
+// a.h
+#ifndef A_H_
+#define A_H_
+typedef struct {
+    int namespace_value;
+    void (*foo)( /* processor::selfcall */ );
+    void (*bar)( /* processor::selfcall */ );
+    void (*baz)( /* processor::selfcall */ );
+} a_namespace_t;
+#endif
+
+// b.h
+#ifndef B_H_
+#define B_H_
+typedef struct {
+    int namespace_value;
+    void (*foo)( /* processor::selfcall */ );
+    void (*bar)( /* processor::selfcall */ );
+    void (*baz)( /* processor::selfcall */ );
+} b_namespace_t;
+#endif
+```
+
+In comparision with a classic function call, now we can call these functions thru the structure:
+```c
+int main() {
+    b_namespace_t* b = make_b_namespace();
+    b->foo();
+    b->bar();
+    b->baz();
+
+    a_namespace_t* a = make_a_namespace();
+    a->foo();
+    a->bar();
+    a->baz();
+    return 0;
+}
+```
+
+Additionally, to implement such a mechanism, user should mark these functions with `static` keyword and implement the `make_a_namespace` function.
+
+# How to use it?
+That's simple! Just create a structure, add any "function" field and mark it with `processor::selfcall`. Let's consider next example:
+```c
+// strobj.h
+#ifndef STRING_H_
+#define STRING_H_
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct {
+    unsigned int size;
+    const char*  body;
+    unsigned int (*length)( /* processor::selfcall */ );
+    int          (*print)( /* processor::selfcall */ );
+} string_t;
+
+string_t* create_string(const char* s);
+int destroy_string(string_t* s);
+
+#endif
+
+// strobj.c
+#include <strobj.h>
+
+static int string_print(string_t* self) {
+    printf("%s, size=%i\n", self->body, self->length());
+    return 1;
+}
+
+static unsigned int string_length(string_t* self) {
+    return self->size;
+}
+
+string_t* create_string(const char* s) {
+    string_t* str = (string_t*)malloc(sizeof(string_t));
+    if (!str) return NULL;
+
+    str->body = (char*)malloc(strlen(s) + 1);
+    if (!str->body) {
+        free(str);
+        return NULL;
+    }
+
+    strcpy(str->body, s);
+    str->print  = string_print;
+    str->length = string_length;
+
+    return str;
+}
+
+int destroy_string(string_t* s) {
+    if (!s) return 0;
+    free(s->body);
+    free(s);
+    return 1;
+}
+
+// main.c
+#include <strobj.h>
+
+int main() {
+    string_t* str = create_string("Hello world!");
+    if (!str) return 1;
+
+    str->print();
+
+    destroy_string(str);
+    return 0;
+}
+```
+
 # Benchmarks
 I know how it's really important to minimize a resource usage as much it's possible. This project is written on Python, that's why it may take some time to proceed an entier preprocess pipeline. Here is some benchmark results, that were taken with `tests/large.c`, `tests/large_1.c`, `tests/large_2.c` and `tests/large_3.c` files.
