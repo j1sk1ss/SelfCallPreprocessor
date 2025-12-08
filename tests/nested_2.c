@@ -34,4 +34,3 @@ int bar()
   ((b_t *) c2.b)->a.foo(&((b_t *) c2.b)->a);
 }
 EXPECTED_CODE*/
-

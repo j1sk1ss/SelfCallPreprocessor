@@ -18,12 +18,17 @@ There is a few things that are needed before we can proceed any further:
 - [loguru](https://github.com/Delgan/loguru) - Fancy-looking logg messages. 
 
 ### Usage
-For a sundbox usage, simply use the one of next commands:
+For a sandbox usage, simply use the one of next commands:
 ```bash
 python3 main.py --file tests/func_test.c
 python3 main.py --file tests/cast_structs.c
 python3 main.py --file tests/complex_structs.c
 python3 main.py --file tests/nested_structs.c
+```
+
+Directory parsing are also supported. To do this, use the next command:
+```bash
+python3 main.py --directory <project> --include <preject_include>
 ```
 
 ### Testing
@@ -248,3 +253,6 @@ void bar(c_t* really_long_name_for_c) {
 ```
 
 Now it looks a way better.
+
+# Benchmarks
+I know how it's really important to minimize a resource usage as much it's possible. This project is written on Python, that's why it may take some time to proceed an entier preprocess pipeline. Here is some benchmark results, that were taken with `tests/large.c`, `tests/large_1.c`, `tests/large_2.c` and `tests/large_3.c` files.
