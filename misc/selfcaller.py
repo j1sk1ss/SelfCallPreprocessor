@@ -1,5 +1,5 @@
 from pycparser import c_ast
-from misc.ast import ASTool
+from misc.ast import ASTool, CallElement
 
 class SelfCallHiddenAdder(c_ast.NodeVisitor):
     """Main AST walker. The main task of this walker is:
@@ -38,26 +38,94 @@ class SelfCallHiddenAdder(c_ast.NodeVisitor):
         self.push_scope()
         self.generic_visit(node)
         self.pop_scope()
+
+    def _resolve_base_struct_type(self, struct_node: c_ast.Node, call_chain: list[CallElement]) -> str:
+        def _get_name(node: c_ast.Node) -> str:
+            while not isinstance(node, str):
+                node = node.name
+            return node
+        
+        def _get_identifier(node: c_ast.Node) -> c_ast.Node:
+            while not isinstance(node, c_ast.IdentifierType):
+                node = node.type
+            return node
+        
+        # Find closest declaration node from the symtble
+        # It isn't suppose to be a correct declaration. We need to figure out where is a start point
+        declaration_name: str = _get_name(struct_node)
+        struct_declaration: c_ast.Node = _get_identifier(self.lookup(declaration_name))
+        declaration_type: str = struct_declaration.names[0]
+        
+        # Add redundant the first cast-call
+        call_chain.insert(0, CallElement(name=declaration_name, cast=declaration_type, call=call_chain[0].name))
+        
+        # Select the last defined structure type
+        # We do such an action given the C-logic, where a last accessed structure has
+        # a same type with the last cast type 
+        for call in reversed(call_chain):
+            if call.cast:
+                declaration_type = call.cast
+                break
+        
+        # Remove redundant the first cast-call
+        call_chain = call_chain[1:]
+
+        # Figure out the basic structure type with the symtable usage
+        # The main idea is to find a source structure of the field chain
+        while True:
+            changed = False
+            for dep_type, dep_field in self.struct_graph.get(declaration_type, []):
+                call = call_chain[0]
+                
+                # This is the 'cast operation'. Given that it isn't a call,
+                # we'll skip it.
+                if call.cast:
+                    continue
+                
+                presented: int = -1
+                for i in range(len(call_chain)):
+                    if call_chain[i].name == dep_field:
+                        presented = i
+                        break
+                
+                if presented < 0:
+                    continue
+                else:
+                    call_chain = call_chain[presented:]
+                    call = call_chain[0]
+                
+                # If there is at least one call in the 'field_chain'
+                # If the current call uses a field from this structure
+                if call_chain and call.name == dep_field:
+                    declaration_type = dep_type
+                    call_chain = call_chain[1:]
+                    changed = True
+                    break
+                
+            if not changed or not call_chain:
+                break
+
+        return declaration_type
         
     def _proceed_structcall(self, node) -> None:
         if isinstance(node, c_ast.FuncCall):
             if isinstance(node.name, c_ast.StructRef):
-                struct_node, field_chain = ASTool.resolve_structref(node.name)
+                struct_node, call_chain = ASTool.resolve_structref(node.name)
                 base_struct_type: str | None = None
                 
                 if isinstance(struct_node, c_ast.ID) or isinstance(struct_node, c_ast.ArrayRef):
-                    base_struct_type = self._resolve_base_struct_type(struct_node=struct_node, field_chain=field_chain)
+                    base_struct_type = self._resolve_base_struct_type(struct_node=struct_node, call_chain=call_chain)
                 elif isinstance(struct_node, c_ast.Cast):
                     base_struct_type = ASTool.get_base_type_from_cast(struct_node)
                 
-                func_name, _ = field_chain[-1]
+                func_name = call_chain[-1].name
                 args = node.args.exprs if node.args else []
                 if (
                     base_struct_type and
                     func_name in self.symtab.get(base_struct_type, []) and
                     not ASTool.has_self_argument(base_struct_type, args)
                 ):
-                    self_node = ASTool.find_self_for_call(node)
+                    self_node = ASTool.find_self_for_call(node, call_chain)
                     if self_node:
                         if node.args:
                             node.args.exprs.insert(0, self_node)
@@ -66,39 +134,6 @@ class SelfCallHiddenAdder(c_ast.NodeVisitor):
 
         elif isinstance(node, c_ast.StructRef):
             self._proceed_structcall(node.name)
-
-    def _resolve_base_struct_type(self, struct_node: c_ast.Node, field_chain: list[tuple]) -> str:
-        def _get_name(node: c_ast.Node) -> str:
-            while not isinstance(node, str):
-                node = node.name
-            return node
-        
-        struct_declaration: c_ast.Node = self.lookup(_get_name(struct_node))
-        while not isinstance(struct_declaration, c_ast.IdentifierType):
-            struct_declaration = struct_declaration.type
-            
-        declaration_type: str = struct_declaration.names[0]
-        for field, cast in reversed(field_chain):
-            if cast:
-                for dep_type, dep_field in self.struct_graph.get(cast, []):
-                    if field == dep_field:
-                        declaration_type = dep_type
-                        break
-                    
-        while True:
-            changed = False
-            for dep_type, dep_field in self.struct_graph.get(declaration_type, []):
-                field_name, cast_name = field_chain[0]
-                if field_chain and dep_field == field_name or cast_name:
-                    declaration_type = dep_type if not cast_name else cast_name 
-                    field_chain = field_chain[1:]
-                    changed = True
-                    break
-                
-            if not changed or not field_chain:
-                break
-
-        return declaration_type
         
     def visit_FuncCall(self, node):
         try:

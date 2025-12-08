@@ -31,7 +31,7 @@ typedef struct
 int bar()
 {
   c_t c2;
-  ((b_t *) c2.b)->a.foo(((b_t *) c2.b)->a);
+  ((b_t *) c2.b)->a.foo(&((b_t *) c2.b)->a);
 }
 EXPECTED_CODE*/
 

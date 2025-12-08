@@ -1,8 +1,21 @@
 from pycparser import c_ast
 
+class CallElement:
+    def __init__(
+        self, 
+        name: str | None, cast: str | None, call: str | None, isref: bool = False
+    ) -> None:
+        self.name: str | None = name
+        self.cast: str | None = cast
+        self.call: str | None = call
+        self.isref: bool = isref
+
+    def __repr__(self) -> str:
+        return f"[name={self.name}{'->' if self.isref else '.'}call={self.call}, cast={self.cast}]"
+
 class ASTool:
     @staticmethod
-    def resolve_structref(node) -> tuple:
+    def resolve_structref(node) -> tuple[c_ast.Node, list[CallElement]]:
         """Extract essential information from StructRef node
 
         Args:
@@ -11,24 +24,36 @@ class ASTool:
         Returns:
             tuple: Return base structure node and call sequence
         """
-        fields: list = []
-        casts: list = []
-        
+        call_chain: list[CallElement] = []
         while True:
             if isinstance(node, c_ast.StructRef):
-                casts.append(None)
-                fields.insert(0, node.field.name)
-                node = node.name # TODO
-            # elif isinstance(node, c_ast.Cast) and isinstance(node.expr, c_ast.StructRef):
-            #     # casts.append(node.to_type.type.type.type.names[0])
-            #     casts.append(None)
-            #     fields.insert(0, node.expr.name.name)
-            #     node = node.expr
+                call_chain.insert(
+                    0, CallElement(name=node.field.name, cast=None, call=None, isref=node.type != '.')
+                )
+                
+                node = node.name
+            elif isinstance(node, c_ast.Cast) and isinstance(node.expr, c_ast.StructRef):
+                call_chain.insert(
+                    0, CallElement(
+                        name=node.expr.field.name, 
+                        cast=node.to_type.type.type.type.names[0], 
+                        call=None,
+                        isref=node.expr.type != '.'
+                    )
+                )
+                
+                node = node.expr
             else:
                 break
             
-        # print(node)
-        return node, list(zip(fields, casts))
+        for i in range(len(call_chain)):
+            for j in range(i + 1, len(call_chain)):
+                if not call_chain[j].cast:
+                    call_chain[i].call = call_chain[j].name
+                    call_chain[i].isref = call_chain[j].isref
+                    break
+        
+        return node, call_chain
     
     @staticmethod
     def get_base_type_from_decl(node) -> str | None:
@@ -96,7 +121,9 @@ class ASTool:
         return False
 
     @staticmethod
-    def find_self_for_call(node) -> c_ast.UnaryOp | c_ast.StructRef | c_ast.ID:
+    def find_self_for_call(
+        node: c_ast.Cast, call_chain: list[CallElement]
+    ) -> c_ast.UnaryOp | c_ast.StructRef | c_ast.ID:
         """Find a root of function call
 
         Args:
@@ -125,8 +152,7 @@ class ASTool:
             elif isinstance(struct_ref, c_ast.ArrayRef):
                 base = c_ast.ArrayRef(name=base, subscript=struct_ref.subscript)
 
-        last_op = chain[0].type if chain else '.'
-        if last_op == '.':
+        if not call_chain[-1].isref:
             base = c_ast.UnaryOp(op='&', expr=base)
 
         return base

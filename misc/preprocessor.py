@@ -76,18 +76,6 @@ class SelfcallExtractor:
             t = m.group("type")
             field = m.group("name")
             t = t.replace("struct ", "").strip()
-            
-            skip: bool = False
-            for i in {
-                "int", "long", "short", "char", "float", "double", "void", "unsigned", "signed", "size_t"
-            }:
-                if i in t.split():
-                    skip = True
-                    break
-
-            if skip:
-                continue
-            
             out.append((t, field))
 
         return out
