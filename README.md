@@ -165,6 +165,8 @@ With a prepared source code, we can safely invoke the `pycparser` library as a m
 - Find a function call node.
 - Check if this function call invoked from a structure.
 - Determine which structure is used.
+![symtab](media/call_chain.png)
+
 - Determine is the invoked function annotated as a `selfcall` function. 
 - If it is, pass the structure itselves to the function' arguments list.
 - Restore the source code from an AST and pass it further.
