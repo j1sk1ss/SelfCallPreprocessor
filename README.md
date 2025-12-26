@@ -75,7 +75,7 @@ int main() {
 }
 ```
 
-As you've notice above, the string structure has addtional annotation in argument' list in every function defenition. This annotation is used for a self argument passing to function calls, that are called from structures. In nutshell, we can use an aforementioned structure in the next new way:
+As you've noticed above, the string structure has addtional annotation in argument's list in every function defenition. This annotation is used for a self argument passing to function calls, that are being called from structures. In the nutshell, we can use the aforementioned structure in the next new way:
 ```c
 int main() {
     string_t s;
@@ -85,7 +85,7 @@ int main() {
 }
 ```
 
-This tool allows us to ignore the first `self` parameter when we invoke a function with the `selfcall` attribute from a structure. 
+This tool allows us to ignore the first `self` parameter when we are invoking a function with the `selfcall` attribute from a structure. 
 
 # How it works?
 ## Summary
@@ -101,7 +101,7 @@ void foo(string_t* a) {
 }
 ```
 
-This is a very simple example of the `selfcall` annotation. With the `processor::selfcall` usage, an user can "reserve" the first argument for the `self` pointer. Aforementioned code snippet, after such a transformation becames a less-readeble, but at least, a correct version of C-code.
+This is a very simple example of the `selfcall` annotation. With the `processor::selfcall` usage, a user can "reserve" the first argument for the `self` pointer. Code snippet above, after such a transformation, becames a less-readeble, but at least, a correct version of C-code.
 ```c
 typedef struct __anon_struct_string_t
 {
@@ -115,10 +115,10 @@ void foo(string_t *a)
 ```
 
 ## C-preprocessor part
-Before any work can be performed, we should get rid from a high-level pre-processor instructions such as `define`, `ifdef`, `undef`, `include`, `__attribute__`, etc. This work can be performed without any problems with use of the inbuilt gcc' pre-processor.
+Before any work can be performed, we must get rid from high-level pre-processor instructions such as `define`, `ifdef`, `undef`, `include`, `__attribute__`, etc. This work can be performed without any problems with the use of the inbuilt gcc's pre-processor.
 
 ## Layout part
-After C-pre-processor part we receive a raw form of a code. For instance I implie the next code as a raw code:
+After the C-pre-processor part we receive a raw form of a code. For instance I implie the next code as a raw code:
 ```c
 typedef struct {
     int (*foo)( /* processor::selfcall */ );
@@ -141,27 +141,27 @@ int bar() {
 }
 ```
 
-With the `misc/preprocessor.py` tool we mark all structures, their depends, and `selfcall` functions. First things first we generate names for structs without name and with an annotated by `selfcall` function:
+With the `misc/preprocessor.py` tool we mark all structures, their dependencies and `selfcall` functions. First things first we generate names for structures without the name and with the annotated by `selfcall` function:
 ```c
 typedef struct __anon_struct_a_t {
     int (*foo)( /* processor::selfcall */ );
 } a_t;
 ```
 
-Then we create a symtable and dependency graph for a provided code / project. This structures will be very helpful at the AST-part. In few words, the `symtable` memorize all functions and structures with the `processor::selfcall` annotation. This helps us to determine, is the selected function reqire a hidden `self` parameter. The `dependency graph` is a simple `DAG`. It links nested structures with each other. To demonstrate such structures, I'll illustatrare them below:
+Then we create a symtable and a dependency graph for a provided code / project. This structures will be very helpful at the AST-part. In few words, the `symtable` memorize all functions and structures with the `processor::selfcall` annotation. This helps us to determine, is the selected function reqires a hidden `self` parameter. The `dependency graph` is a simple `DAG`. It links nested structures with each other. To demonstrate such structures, I'll illustatrare them below:
 ![symtab](media/first_phase.png)
 
-After aforementioned preparations, we replace the annotation `/* processor::selfcall */` with a structure signature:
+After the aforementioned preparations, we replace the annotation `/* processor::selfcall */` with a structure signature:
 ```c
 typedef struct __anon_struct_a_t {
     int (*foo)( struct __anon_struct_a_t* );
 } a_t;
 ```
 
-That' all what we do at this level. Now we can proceed further.
+That's all what we do at this level. Now we can proceed further.
 
 ## AST part
-With a prepared source code, we can safely invoke the `pycparser` library as a main parser in this project. The main idea of this part is simple:
+With the prepared source code, we can safely invoke the `pycparser` library as a main parser in this project. The main idea of this part is simple:
 - Find a function call node.
 - Check if this function call invoked from a structure.
 - Determine which structure is used.
@@ -171,7 +171,7 @@ With a prepared source code, we can safely invoke the `pycparser` library as a m
 - If it is, pass the structure itselves to the function' arguments list.
 - Restore the source code from an AST and pass it further.
 
-The final result of aforementioned operations is a code, where all function calls, that are marked as `selfcall`s, fulfiled with the structure' pointer:
+The final result of the aforementioned operations is the code, where all function calls, that are marked as `selfcall`s, fulfiled by a structure's pointer:
 ```c
 typedef struct __anon_struct_a_t {
     int (*foo)( struct __anon_struct_a_t* );
@@ -193,7 +193,7 @@ int bar() {
 
 # Benefits
 ## Rust-style structures
-Now C-programmer is able to use C-structures in a more convenient way. Instead of always passing structure itself as `self`-parameter:
+Now a C-programmer is able to use C-structures in a more convenient way. Instead of always passing a structure itself as a `self`-parameter:
 ```c
 typedef struct a {
     int (*foo)(struct a*);
@@ -204,7 +204,7 @@ void bar(a_t* a) {
 }
 ```
 
-he can simply annotate a function with `processor::selfcall` and use a Rust-like syntax:
+he can simply annotate a function with the `processor::selfcall` annotation and use a Rust-like syntax:
 ```c
 typedef struct {
     int (*foo)( /* processor::selfcall */ );
