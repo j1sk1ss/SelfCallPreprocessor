@@ -42,25 +42,28 @@ def run_processor(c_file: Path) -> str:
 
 def _run_all_tests():
     for c_file in TESTS_DIR.glob("*.c"):
-        logger.info(f"=== {c_file.name} ===")
+        try:
+            logger.info(f"=== {c_file.name} ===")
 
-        expected = _extract_expected_code(c_file)
-        got = run_processor(c_file).strip()
-        if got == expected:
-            logger.success("PASSED")
-            continue
+            expected = _extract_expected_code(c_file)
+            got = run_processor(c_file).strip()
+            if got == expected:
+                logger.success("PASSED")
+                continue
 
-        logger.error("FAILED — diff dump:\n")
-        diff = difflib.unified_diff(
-            expected.splitlines(),
-            got.splitlines(),
-            fromfile="expected",
-            tofile="got",
-            lineterm=""
-        )
-        
-        for line in diff:
-            print(line)
+            logger.error("FAILED — diff dump:\n")
+            diff = difflib.unified_diff(
+                expected.splitlines(),
+                got.splitlines(),
+                fromfile="expected",
+                tofile="got",
+                lineterm=""
+            )
+            
+            for line in diff:
+                print(line)
+        except Exception as ex:
+            logger.critical(f"Test failed due to the error: {str(ex)}")
 
 if __name__ == "__main__":
     _run_all_tests()
