@@ -6,8 +6,8 @@ This repository contains a preprocessor for C language. The main idea is the `se
     - `preprocessor.py` - Python attribute preprocessor. See `misc/README.md` for details.
     - `selfcaller.py` - Python the `C language AST-walker `. See `misc/README.md` for details.
 - `tests` - C source files for test purposes.
-- `vscode` - Preprocessor's extention to supress warnings from a canonical C-extention.
 - `main.py` - Entry point.
+- `main_benchmark.py` - Entry point but with additional measurements such as build time and pre-process. 
 
 ## Requiered tools & Usage
 ### Required tools

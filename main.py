@@ -33,8 +33,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='SelfCall preprocessor!')
     parser.add_argument('--file', default=None, help='Source C file for the SeflCall preprocessing')
     parser.add_argument('--directory', default=None, help='Source C file for the SeflCall preprocessing')
-    parser.add_argument('--include', default=None, help='Source include folder for the project')
-    parser.add_argument('--symtable', default=None, help='Source an symtable.smt file for the SeflCall preprocessing')
+    parser.add_argument('--include', default=None, help='Source an include folder for the project')
+    parser.add_argument('--symtable', default=None, help='Source a symtable.smt file for the SeflCall preprocessing')
     parser.add_argument("--save-symtab", action="store_true", help="Dump a built symtable")
     args = parser.parse_args()
     
