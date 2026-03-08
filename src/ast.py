@@ -93,8 +93,6 @@ class ASTool:
             return ASTool.get_base_type_from_cast(node.name)
         elif isinstance(node, c_ast.ID):
             return node.name
-        
-        return None
 
     @staticmethod
     def has_self_argument(name: str, args: list | None) -> bool:

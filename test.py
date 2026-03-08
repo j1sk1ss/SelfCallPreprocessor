@@ -7,8 +7,8 @@ from loguru import logger
 from pycparser import c_parser, c_generator
 
 from pathlib import Path
-from misc.preprocessor import SelfcallExtractor
-from misc.selfcaller import SelfCallHiddenAdder
+from src.directive import DirectiveParser
+from src.selfcaller import SelfCallHiddenAdder
 
 TESTS_DIR = Path("tests")
 START = "/*EXPECTED_CODE"
@@ -29,7 +29,7 @@ def _extract_expected_code(path: Path) -> str:
     return block
 
 def run_processor(c_file: Path) -> str:
-    processor: SelfcallExtractor = SelfcallExtractor(c_file.read_text(encoding="utf8"))
+    processor: DirectiveParser = DirectiveParser(c_file.read_text(encoding="utf8"))
     symtab, struct_graph = processor.build_symtable()
     parser = c_parser.CParser()
     ast = parser.parse(processor.process_code())

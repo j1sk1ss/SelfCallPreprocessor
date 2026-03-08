@@ -1,6 +1,10 @@
+"""This file primary address the directives. It will complete the related
+symtable.
+"""
+
 import re
 
-class SelfcallExtractor:
+class DirectiveParser:
     _typedef_re = re.compile(
         r"""
         typedef\s+struct
@@ -192,56 +196,3 @@ class SelfcallExtractor:
 
         code = re.sub(self._comments, "", code)
         return code
-
-if __name__ == '__main__':
-    worker: SelfcallExtractor = SelfcallExtractor(
-        code="""
-typedef struct {
-    int (*foo)( /* processor::selfcall */ );
-} a_t;
-
-typedef struct {
-    a_t a;
-} b_t;
-
-typedef struct {
-    b_t b;
-} c_t;
-
-/*EXPECTED_CODE
-EXPECTED_CODE*/
-        """
-    )
-    
-    result, deps = worker.build_symtable()
-    expected_result = {
-        "a_t": ["foo"],
-        "__anon_struct_a_t": ["foo"],
-    }
-    
-    expected_deps = {
-        "a_t": [],
-        "__anon_struct_a_t": [],
-        "b_t": [("a_t", "a")],
-        "c_t": [("b_t", "b")],
-    }
-
-    assert result == expected_result, f"result mismatch:\n{result}\n!=\n{expected_result}"
-    assert deps == expected_deps, f"deps mismatch:\n{deps}\n!=\n{expected_deps}"
-
-    expected: str = """
-typedef struct __anon_struct_a_t {
-    int (*foo)( struct __anon_struct_a_t* );
-} a_t;
-
-typedef struct {
-    a_t a;
-} b_t;
-
-typedef struct {
-    b_t b;
-} c_t;
-    """
-
-    assert worker.process_code().strip() == expected.strip(), "Resuled code mismatch!"
-    print("Ok")

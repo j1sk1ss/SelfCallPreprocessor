@@ -9,8 +9,8 @@ from pathlib import Path
 from pycparser import c_parser, c_generator
 from loguru import logger
 
-from misc.selfcaller import SelfCallHiddenAdder
-from misc.preprocessor import SelfcallExtractor
+from src.selfcaller import SelfCallHiddenAdder
+from src.directive import DirectiveParser
 
 def _gcc_preprocess_code(include: str, code: str) -> str:
     with tempfile.NamedTemporaryFile(suffix=".i", delete=True) as tmp:
@@ -50,7 +50,7 @@ if __name__ == '__main__':
             for path in directory.rglob("*"):
                 if path.suffix.lower() in (".c", ".h"):
                     with path.open() as f:
-                        processor = SelfcallExtractor(f.read())
+                        processor = DirectiveParser(f.read())
                         symtab, struct_graph = processor.build_symtable()
                         global_symtab.update(symtab)                    
                         for k, v in struct_graph.items():
@@ -66,7 +66,7 @@ if __name__ == '__main__':
             for path in sorted(directory.rglob("*")):
                 if path.suffix.lower() in (".c", ".h"):
                     with path.open() as f:
-                        processor = SelfcallExtractor(f.read())
+                        processor = DirectiveParser(f.read())
                         modified_code = processor.process_code()
                         all_sources += f"\n/* --- {path.relative_to(directory)} --- */\n"
                         all_sources += modified_code
@@ -88,7 +88,7 @@ if __name__ == '__main__':
         logger.info(f"Final code: \n```c\n{_process_all_files(directory, symtab, struct_graph)}\n```")
     elif args.file:
         with open(args.file) as f:
-            processor: SelfcallExtractor = SelfcallExtractor(f.read())
+            processor: DirectiveParser = DirectiveParser(f.read())
             symtab, struct_graph = processor.build_symtable()
             processed_code: str = processor.process_code()
             

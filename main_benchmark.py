@@ -15,8 +15,8 @@ import pyfiglet
 from loguru import logger
 from pycparser import c_generator, c_parser
 
-from misc.preprocessor import SelfcallExtractor
-from misc.selfcaller import SelfCallHiddenAdder
+from src.directive import DirectiveParser
+from src.selfcaller import SelfCallHiddenAdder
 
 
 @dataclass
@@ -220,7 +220,7 @@ def _collect_global_symbols(directory: Path) -> tuple[dict[str, list[str]], dict
             continue
 
         source = path.read_text(encoding="utf-8")
-        processor = SelfcallExtractor(source)
+        processor = DirectiveParser(source)
         symtab, struct_graph = processor.build_symtable()
 
         global_symtab.update(symtab)
@@ -242,7 +242,7 @@ def _transform_source(
 ) -> tuple[str, float, dict, dict]:
     t0 = time.perf_counter()
 
-    processor = SelfcallExtractor(source_text)
+    processor = DirectiveParser(source_text)
 
     if symtab is None or struct_graph is None:
         symtab, struct_graph = processor.build_symtable()
@@ -542,7 +542,7 @@ if __name__ == "__main__":
 
         if args.save_symtab and not args.symtable:
             source_text = src.read_text(encoding="utf-8")
-            processor = SelfcallExtractor(source_text)
+            processor = DirectiveParser(source_text)
             symtab, graph = processor.build_symtable()
             _save_symtable(Path(args.save_symtab), symtab, graph)
             logger.info(f"Symtable saved to: {args.save_symtab}")

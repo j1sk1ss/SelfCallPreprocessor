@@ -1,5 +1,5 @@
 from pycparser import c_ast
-from misc.ast import ASTool, CallElement
+from src.ast import ASTool, CallElement
 
 class SelfCallHiddenAdder(c_ast.NodeVisitor):
     """Main AST walker. The main task of this walker is:
@@ -10,9 +10,9 @@ class SelfCallHiddenAdder(c_ast.NodeVisitor):
         c_ast (_type_): Default constructor for an AST walker.
     """
     def __init__(self, symtab: dict, struct_graph: dict):
-        self.struct_graph = struct_graph
-        self.symtab = symtab
-        self.scopes = [{}]
+        self.struct_graph: dict = struct_graph
+        self.symtab: dict       = symtab
+        self.scopes: list[dict] = [{}]
         
     def push_scope(self) -> None:
         self.scopes.append({})
