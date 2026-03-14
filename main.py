@@ -6,10 +6,10 @@ sys.path.extend(['.', '..'])
 
 import pyfiglet
 from pathlib import Path
-from pycparser import c_parser, c_generator
+from pycparser import c_parser, c_generator, c_ast
 from loguru import logger
 
-from src.selfcaller import SelfCallHiddenAdder
+from src.walkers.selfcaller import SelfCallHiddenAdder
 from src.directive import DirectiveParser
 
 def _gcc_preprocess_code(include: str, code: str) -> str:
@@ -36,6 +36,7 @@ if __name__ == '__main__':
     parser.add_argument('--include', default=None, help='Source an include folder for the project')
     parser.add_argument('--symtable', default=None, help='Source a symtable.smt file for the SeflCall preprocessing')
     parser.add_argument("--save-symtab", action="store_true", help="Dump a built symtable")
+    parser.add_argument("--emit-ast", action="store_true", help="Emit the produced AST")
     args = parser.parse_args()
     
     if not args.file and not args.directory:
@@ -97,7 +98,9 @@ if __name__ == '__main__':
             logger.info(f"Pre-processed code:\n```c\n{processed_code}```")
             
             parser = c_parser.CParser()
-            ast = parser.parse(processed_code)
+            ast: c_ast.FileAST = parser.parse(processed_code)
+            if args.emit_ast:
+                ast.show()
             
             v: SelfCallHiddenAdder = SelfCallHiddenAdder(symtab=symtab, struct_graph=struct_graph)
             v.visit(ast)

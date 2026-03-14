@@ -16,8 +16,7 @@ from loguru import logger
 from pycparser import c_generator, c_parser
 
 from src.directive import DirectiveParser
-from src.selfcaller import SelfCallHiddenAdder
-
+from src.walkers.selfcaller import SelfCallHiddenAdder
 
 @dataclass
 class BenchmarkSummary:
@@ -35,14 +34,12 @@ class BenchmarkSummary:
     delta_compile_only_avg: float
     delta_compile_only_pct: float
 
-
 def _mean_std(values: list[float]) -> tuple[float, float]:
     if not values:
         return 0.0, 0.0
     if len(values) == 1:
         return values[0], 0.0
     return statistics.fmean(values), statistics.stdev(values)
-
 
 def _summarize(
     baseline_runs: list[float],
@@ -84,11 +81,9 @@ def _summarize(
         delta_compile_only_pct=delta_compile_only_pct,
     )
 
-
 def _load_symtable(path: Path) -> tuple[dict, dict]:
     data = json.loads(path.read_text(encoding="utf-8"))
     return data["symtab"], data["struct_graph"]
-
 
 def _save_symtable(path: Path, symtab: dict, struct_graph: dict) -> None:
     payload = {
@@ -96,7 +91,6 @@ def _save_symtable(path: Path, symtab: dict, struct_graph: dict) -> None:
         "struct_graph": struct_graph,
     }
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-
 
 def _gcc_preprocess_code(include_dirs: list[str], cpp_args: list[str], code: str) -> str:
     tmp = tempfile.NamedTemporaryFile(suffix=".i", delete=False)
@@ -137,7 +131,6 @@ def _gcc_preprocess_code(include_dirs: list[str], cpp_args: list[str], code: str
     finally:
         if tmp_path.exists():
             tmp_path.unlink()
-
 
 def _compile_path(
     source_path: Path,
@@ -184,7 +177,6 @@ def _compile_path(
         if obj_path.exists():
             obj_path.unlink()
 
-
 def _compile_code(
     code: str,
     compiler: str,
@@ -210,7 +202,6 @@ def _compile_code(
         if src_path.exists():
             src_path.unlink()
 
-
 def _collect_global_symbols(directory: Path) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
     global_symtab: dict[str, list[str]] = {}
     global_graph: dict[str, list[str]] = {}
@@ -231,7 +222,6 @@ def _collect_global_symbols(directory: Path) -> tuple[dict[str, list[str]], dict
             global_graph[key].extend(values)
 
     return global_symtab, global_graph
-
 
 def _transform_source(
     source_text: str,
@@ -262,7 +252,6 @@ def _transform_source(
     elapsed = time.perf_counter() - t0
     return generated_code, elapsed, symtab, struct_graph
 
-
 def _dump_transformed_file(
     dump_root: Path,
     original_path: Path,
@@ -278,7 +267,6 @@ def _dump_transformed_file(
 
     dump_path.parent.mkdir(parents=True, exist_ok=True)
     dump_path.write_text(transformed_code, encoding="utf-8")
-
 
 def _benchmark_file(
     source_path: Path,

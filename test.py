@@ -8,7 +8,7 @@ from pycparser import c_parser, c_generator
 
 from pathlib import Path
 from src.directive import DirectiveParser
-from src.selfcaller import SelfCallHiddenAdder
+from src.walkers.selfcaller import SelfCallHiddenAdder
 
 TESTS_DIR = Path("tests")
 START = "/*EXPECTED_CODE"
